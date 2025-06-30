@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sociopedia - Laboratorium Sosiologi Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Vibrant Violet -->
+    <!-- Application Structure Plan: Desain aplikasi ini adalah Single-Page Application (SPA) dengan pendekatan modular yang berpusat pada 'Alur Belajar'. Struktur ini dipilih agar pengguna (siswa) dapat fokus pada satu bab pada satu waktu, namun tetap dapat dengan mudah mengakses fitur-fitur interaktif pendukung seperti 'Laboratorium' atau 'Ruang Kolaborasi'. Navigasi utama di bagian atas memungkinkan perpindahan antar 'ruang' (Beranda, Alur Belajar, Laboratorium, dll.) secara dinamis tanpa memuat ulang halaman, menciptakan pengalaman yang mulus. Pendekatan ini paling sesuai untuk konten pendidikan karena meniru alur pembelajaran yang terstruktur (bab per bab) sambil menyediakan 'ruang bermain' untuk eksplorasi konsep secara bebas, yang mendukung pilar Meaningful, Mindful, dan Joyful Learning. -->
+    <!-- Visualization & Content Choices: 
+        - [Bab 2: Penelitian Sosial] -> Goal: Membandingkan & Menginformasikan -> Viz: Bar Chart (Chart.js/Canvas) -> Interaction: Tombol untuk mengganti set data (Contoh Kuantitatif vs. Kualitatif) -> Justification: Visualisasi bar chart efektif untuk membandingkan jumlah responden atau frekuensi jawaban dalam simulasi penelitian, membuat konsep metode penelitian lebih konkret.
+        - [Bab 5: Masyarakat Multikultural] -> Goal: Menginformasikan & Mengorganisir -> Viz: Donut Chart (Chart.js/Canvas) -> Interaction: Tooltip saat hover untuk detail persentase -> Justification: Donut chart secara visual menarik dan efektif untuk menunjukkan proporsi keberagaman (misal: agama, suku) di Indonesia, mengilustrasikan konsep diferensiasi sosial dengan jelas.
+        - [Diagram Proses] -> Goal: Mengorganisir & Menjelaskan Perubahan -> Viz: HTML/CSS/Tailwind Flexbox -> Interaction: Highlighting pada tahap aktif -> Justification: Menggunakan elemen HTML yang diberi gaya adalah cara yang paling fleksibel dan responsif untuk membuat diagram proses seperti 'Tahapan Keteraturan Sosial' tanpa menggunakan SVG.
+        - [Simulasi Interaktif] -> Goal: Aplikasi & Keterlibatan Aktif -> Viz: Kartu dan Teks Dinamis (HTML/JS) -> Interaction: Pilihan berbasis tombol (Choose Your Own Adventure) -> Justification: Ini adalah cara paling efektif untuk menerapkan konsep seperti 'Tindakan Sosial' (Bab 3), memungkinkan siswa untuk mengalami langsung konsekuensi dari pilihan teoretis dalam skenario yang relevan.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7ff; }
+        .smooth-transition { transition: all 0.3s ease-in-out; }
+        .nav-link { position: relative; padding-bottom: 4px; }
+        .nav-link::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background-color: #6D28D9; transition: width 0.3s ease-in-out; }
+        .nav-link.active::after, .nav-link:hover::after { width: 100%; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.7s ease-in-out, padding 0.7s ease-in-out; }
+        .accordion-content.open { max-height: 8000px; }
+        
+        .chapter-card { transition: all 0.3s ease; border: 1px solid #E5E7EB; }
+        .chapter-card:hover { transform: translateY(-10px) scale(1.02); box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); border-color: #6D28D9; }
+        
+        .quiz-option { cursor: pointer; border: 2px solid #e5e7eb; }
+        .quiz-option:hover { border-color: #8B5CF6; background-color: #F5F3FF; }
+        .quiz-option.selected { border-color: #6D28D9; background-color: #EDE9FE; }
+        .quiz-option.correct { background-color: #D1FAE5; border-color: #10B981; }
+        .quiz-option.incorrect { background-color: #FEE2E2; border-color: #EF4444; }
+
+        #chatbot-button { position: fixed; bottom: 2rem; right: 2rem; z-index: 1001; }
+        
+        /* MOBILE FIRST: Default to full-screen, hidden at the bottom */
+        #chatbot-window {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            transform: translateY(100%);
+            transition: transform 0.4s ease-in-out;
+            pointer-events: none;
+            background-color: white; /* Add background for mobile view */
+        }
+
+        #chatbot-window.open {
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* DESKTOP OVERRIDE: Apply floating window styles only on larger screens */
+        @media (min-width: 768px) { /* Corresponds to Tailwind's 'md' breakpoint */
+            #chatbot-window {
+                top: auto;
+                bottom: 6.5rem;
+                right: 2rem;
+                left: auto;
+                width: 90%;
+                max-width: 400px;
+                height: 70vh;
+                max-height: 500px;
+                transform: translateY(20px) scale(0.95);
+                opacity: 0;
+                border-radius: 1rem; /* equivalent to rounded-2xl */
+                box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+                transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            }
+            #chatbot-window.open {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .prose h4 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #111827; }
+        .prose h5 { font-size: 1.1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; color: #1f2937; }
+        .prose p { margin-bottom: 1rem; line-height: 1.6; }
+        .prose ul { list-style-position: inside; margin-left: 0.5rem; margin-bottom: 1rem; }
+        .prose li { margin-bottom: 0.5rem; }
+        .prose strong { color: #111827; }
+
+        /* Mobile Navigation Styles */
+        @media (max-width: 767px) { /* Below Tailwind's 'md' breakpoint */
+            #main-nav {
+                position: absolute;
+                top: 100%; /* Position it right below the header */
+                left: 0;
+                right: 0;
+                background-color: white;
+                z-index: 50;
+                padding: 1rem;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                transform: translateY(-10px);
+                opacity: 0;
+                pointer-events: none;
+                transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            }
+            #main-nav.open {
+                transform: translateY(0);
+                opacity: 1;
+                pointer-events: auto;
+            }
+            #main-nav a {
+                display: block;
+                padding: 0.75rem 0;
+                text-align: center;
+                border-bottom: 1px solid #f3f4f6; /* light gray border */
+            }
+            #main-nav a:last-child {
+                border-bottom: none;
+            }
+        }
+
+    </style>
+</head>
+<body class="bg-violet-50 text-gray-800">
+
+    <div id="app" class="container mx-auto px-4 md:px-8 py-6">
+        
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b-2 border-violet-200 relative">
+            <div class="flex items-center justify-between w-full md:w-auto">
+                <div class="flex items-center gap-4">
+                    <button onclick="navigateTo('beranda')" class="text-3xl p-2 rounded-full hover:bg-violet-100 smooth-transition" aria-label="Kembali ke Beranda">🏠</button>
+                    <h1 class="text-3xl md:text-4xl font-bold text-violet-900">Sociopedia</h1>
+                </div>
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-button" class="md:hidden text-3xl p-2 rounded-full hover:bg-violet-100 smooth-transition" aria-label="Buka Menu">
+                    ☰
+                </button>
+            </div>
+            <!-- Main Navigation -->
+            <nav id="main-nav" class="w-full md:w-auto mt-4 md:mt-0 md:flex">
+                <a href="#beranda" class="nav-link active text-lg font-semibold text-gray-600 hover:text-violet-700 mx-3">Beranda</a>
+                <a href="#alur-belajar" class="nav-link text-lg font-semibold text-gray-600 hover:text-violet-700 mx-3">Alur Belajar</a>
+                <a href="#glosarium" class="nav-link text-lg font-semibold text-gray-600 hover:text-violet-700 mx-3">Glosarium</a>
+            </nav>
+        </header>
+
+        <main>
+            <section id="beranda" class="page-content">
+                <div class="text-center py-8 md:py-16">
+                    <h2 class="text-4xl md:text-6xl font-bold text-violet-900 mb-4">Laboratorium Digital Sosiologi</h2>
+                    <p class="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto mb-16">Selamat datang, Sosiolog Muda! Pilih satu topik di bawah ini untuk memulai investigasi Anda, atau tanyakan apa saja pada SocioBot.</p>
+                    
+                    <div id="chapter-navigation" class="flex flex-wrap justify-center items-stretch gap-8">
+                        <!-- Chapter cards will be generated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="alur-belajar" class="page-content hidden">
+                 <div class="text-center mb-10">
+                    <h2 class="text-3xl font-bold text-violet-800">Alur Belajar Sosiologi</h2>
+                    <p class="text-lg text-gray-600 mt-2 max-w-3xl mx-auto">Setiap modul dirancang untuk membangun pemahaman Anda secara bertahap. Klik setiap bab untuk melihat materi lengkap dan kuis evaluasi.</p>
+                </div>
+                <div id="accordion-container" class="space-y-4">
+                </div>
+            </section>
+            
+            <section id="glosarium" class="page-content hidden">
+                 <div class="text-center mb-10">
+                    <h2 class="text-3xl font-bold text-violet-800">Glosarium Sosiologi</h2>
+                    <p class="text-lg text-gray-600 mt-2 max-w-3xl mx-auto">Kamus istilah-istilah kunci untuk membantu pemahaman Anda dalam mempelajari sosiologi kelas X.</p>
+                </div>
+                <div id="glossary-container" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border">
+                    <!-- Glossary content will be generated by JavaScript -->
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <!-- Chatbot Feature -->
+    <div id="chatbot-container">
+        <button id="chatbot-button" onclick="toggleChatbot()" class="bg-gradient-to-br from-fuchsia-500 to-violet-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg text-3xl smooth-transition hover:scale-110" aria-label="Buka Chatbot">
+            🤖
+        </button>
+        <div id="chatbot-window" class="flex flex-col">
+            <div class="p-4 bg-gray-100 flex justify-between items-center border-b border-gray-200 md:rounded-t-2xl">
+                <h3 class="text-lg font-bold text-violet-900">SocioBot Tutor</h3>
+                <button onclick="toggleChatbot()" class="text-2xl text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-4">
+                <div class="p-3 bg-violet-100 rounded-lg max-w-xs text-gray-800 self-start">
+                    <p>Halo! Saya SocioBot, AI dengan sejuta pesona. Tanya apa saja, dari sosiologi sampai soal hati, aku siap menjawab!</p>
+                </div>
+            </div>
+            <div class="p-4 bg-white border-t md:rounded-b-2xl">
+                <div class="flex gap-2">
+                    <input type="text" id="chat-input" class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500" placeholder="Ketik pertanyaanmu...">
+                    <button id="send-btn" onclick="sendMessage()" class="bg-violet-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-violet-700">Kirim</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const appData = {
+            modules: [
+                {
+                    title: "Bab 1. Pengantar Sosiologi",
+                    description: "Mengungkap asal-usul, tokoh, dan cara pandang dasar ilmu sosiologi.",
+                    icon: "🎓",
+                    fullContent: `
+                        <div class="prose">
+                            <h4>A. Sejarah Kelahiran dan Kajian Sosiologi</h4>
+                            <h5>Perkembangan Sosiologi di Eropa</h5>
+                            <p>Sosiologi dikenal sebagai ilmu yang mempelajari berbagai fenomena berupa masalah sosial dalam masyarakat. Sosiologi lahir dari kegelisahan para ilmuwan seperti <strong>Auguste Comte</strong> (Bapak Sosiologi) yang hidup setelah Revolusi Prancis. Ia ingin memahami tatanan dan dinamika masyarakat secara ilmiah. Istilah sosiologi sendiri berasal dari kata <em>socious</em> (kawan) dan <em>logos</em> (ilmu), artinya ilmu tentang masyarakat.</p>
+                            <p>Jauh sebelum Comte, sejarawan <strong>Ibnu Khaldun</strong> di abad ke-14 juga telah mengkaji masyarakat secara mendalam dalam karyanya, Muqaddimah. Namun, perkembangan pesat sosiologi dipicu oleh dua revolusi besar di Eropa: <strong>Revolusi Industri</strong>, yang mengubah masyarakat agraris menjadi industri dan menciptakan masalah sosial baru seperti kemiskinan dan pengangguran; dan <strong>Revolusi Prancis</strong>, yang mengubah tatanan politik dan sosial secara drastis.</p>
+                            <h6>Tokoh-tokoh Sosiologi Klasik Eropa:</h6>
+                            <ul>
+                                <li><strong>Emile Durkheim:</strong> Meneliti tentang bunuh diri (Suicide) untuk menunjukkan bagaimana faktor sosial (seperti anomie atau ketiadaan norma) memengaruhi tindakan individu.</li>
+                                <li><strong>Karl Marx:</strong> Terkenal dengan teori konflik, yang menyatakan bahwa sejarah masyarakat adalah sejarah pertentangan antara kelas borjuis (pemilik modal) dan proletar (pekerja).</li>
+                                <li><strong>Max Weber:</strong> Memperkenalkan konsep <em>Verstehen</em> (pemahaman interpretatif) untuk memahami makna di balik tindakan sosial individu. Karyanya yang terkenal adalah "Etika Protestan dan Semangat Kapitalisme".</li>
+                                <li><strong>Talcott Parsons:</strong> Mengembangkan teori fungsionalisme struktural, yang melihat masyarakat sebagai sistem yang terdiri dari bagian-bagian yang saling berfungsi untuk menjaga keseimbangan.</li>
+                            </ul>
+                            
+                            <h5>Perkembangan Sosiologi di Indonesia</h5>
+                            <p>Di Indonesia, sosiologi mulai dikenal dan berkembang setelah Proklamasi Kemerdekaan. Awalnya, pemikiran sosiologis banyak dipengaruhi oleh para pemikir dan cendekiawan Belanda. Namun, sosiologi sebagai ilmu yang diajarkan secara formal baru dimulai sekitar tahun 1950-an. Tokoh yang dianggap sebagai Bapak Sosiologi Indonesia adalah <strong>Selo Soemardjan</strong>.</p>
+                            <p>Bersama <strong>Soelaeman Soemardi</strong>, ia mendefinisikan sosiologi sebagai ilmu kemasyarakatan yang mempelajari struktur sosial dan proses-proses sosial, termasuk perubahan sosial. Perkembangan sosiologi di Indonesia sangat erat kaitannya dengan kebutuhan untuk memahami dan menyelesaikan masalah-masalah sosial dalam proses pembangunan bangsa. Universitas Gadjah Mada (UGM) dan Universitas Indonesia (UI) menjadi pelopor dalam pengembangan studi sosiologi di tanah air.</p>
+                            
+                            <h4>B. Sosiologi Sebagai Ilmu Pengetahuan</h4>
+                            <p>Sosiologi memiliki empat sifat utama sebagai ilmu:</p>
+                            <ul>
+                                <li><strong>Empiris:</strong> Berdasarkan observasi dan penelitian ilmiah terhadap fakta sosial, bukan asumsi.</li>
+                                <li><strong>Teoritis:</strong> Berusaha menyusun kesimpulan dan menjelaskan hubungan sebab-akibat dari gejala sosial.</li>
+                                <li><strong>Kumulatif:</strong> Teori-teori yang ada terus berkembang, diperbaiki, dan diperluas berdasarkan teori-teori sebelumnya.</li>
+                                <li><strong>Non-Etis:</strong> Tidak mempersoalkan baik atau buruknya suatu fakta, tetapi bertujuan untuk menjelaskannya secara objektif.</li>
+                            </ul>
+
+                            <h4>C. Sosiologi Sebagai Ilmu yang Berparadigma Ganda</h4>
+                            <p>Menurut George Ritzer, sosiologi memiliki berbagai cara pandang (paradigma) untuk menganalisis masyarakat:</p>
+                            <ul>
+                                <li><strong>Paradigma Fakta Sosial:</strong> Fokus pada struktur sosial, norma, dan nilai yang berada di luar individu dan memiliki kekuatan memaksa (koersif). Individu dianggap dikendalikan oleh fakta sosial ini.</li>
+                                <li><strong>Paradigma Definisi Sosial:</strong> Fokus pada bagaimana individu memberikan makna pada dunia di sekitarnya dan bagaimana makna tersebut memengaruhi tindakan mereka. Tindakan sosial adalah objek utamanya.</li>
+                                <li><strong>Paradigma Perilaku Sosial:</strong> Fokus pada perilaku individu dan hubungan sebab-akibatnya dengan lingkungan. Konsep seperti rangsangan (stimulus) dan tanggapan (respons), serta penghargaan (reward) dan hukuman (punishment) menjadi kunci.</li>
+                            </ul>
+                        </div>
+                    `,
+                    quiz: [
+                        { question: "Siapakah sosiolog yang dikenal sebagai 'Bapak Sosiologi' dan memperkenalkan aliran positivisme?", options: ["Karl Marx", "Max Weber", "Emile Durkheim", "Auguste Comte", "Talcott Parsons"], answer: "Auguste Comte" },
+                        { question: "Paradigma yang memfokuskan kajian sosiologi pada norma, aturan, dan struktur sosial yang dianggap mengendalikan individu adalah...", options: ["Paradigma Definisi Sosial", "Paradigma Perilaku Sosial", "Paradigma Fakta Sosial", "Paradigma Interaksionisme", "Paradigma Konflik"], answer: "Paradigma Fakta Sosial" }
+                    ]
+                },
+                {
+                    title: "Bab 2. Penelitian Sosial",
+                    description: "Mempelajari cara sosiolog bekerja mengumpulkan data dan fakta.",
+                    icon: "🔬",
+                    fullContent: `<div class="prose text-center text-gray-500 py-8">Materi untuk bab ini sedang dalam pengembangan. Mohon kembali lagi nanti!</div>`,
+                     quiz: [
+                        { question: "Metode penelitian yang menguji teori dengan meneliti hubungan antarvariabel dan mengukurnya secara matematis disebut...", options: ["Penelitian Kualitatif", "Penelitian Kuantitatif", "Studi Kasus", "Etnografi", "Penelitian Campuran"], answer: "Penelitian Kuantitatif" },
+                        { question: "Dalam etika penelitian, peneliti wajib mendapatkan persetujuan dari subjek penelitian. Hal ini dikenal dengan istilah...", options: ["Plagiasi", "Informed Consent", "Bias Penelitian", "Validitas Data", "Reduksi Data"], answer: "Informed Consent" }
+                    ]
+                },
+                {
+                    title: "Bab 3. Tindakan Sosial, Interaksi Sosial dan Identitas",
+                    description: "Menyelami inti dari hubungan antarmanusia di masyarakat.",
+                    icon: "🤝",
+                    fullContent: `<div class="prose text-center text-gray-500 py-8">Materi untuk bab ini sedang dalam pengembangan. Mohon kembali lagi nanti!</div>`,
+                     quiz: [
+                        { question: "Seorang siswa yang belajar giat untuk mendapatkan ranking pertama (tujuan) dengan cara yang efisien (membuat rangkuman) adalah contoh dari tindakan sosial...", options: ["Afektif", "Tradisional", "Rasional Berorientasi Nilai", "Rasional Instrumental", "Irasional"], answer: "Rasional Instrumental" },
+                        { question: "Proses sosial yang mengarah pada persatuan atau integrasi sosial, seperti kerja sama dan akomodasi, disebut proses...", options: ["Disosiatif", "Asosiatif", "Identifikasi", "Kontravensi", "Konflik"], answer: "Asosiatif" }
+                    ]
+                },
+            ],
+            glossary: [
+                { term: "Akomodasi", definition: "Suatu proses penyesuaian sosial untuk meredakan pertentangan antara dua pihak atau lebih guna mencapai kestabilan." },
+                { term: "Akulturasi", definition: "Proses sosial yang timbul bila suatu kelompok manusia dengan kebudayaan tertentu dihadapkan dengan unsur dari suatu kebudayaan asing sehingga unsur kebudayaan asing itu lambat laun diterima tanpa menyebabkan hilangnya kepribadian kebudayaan itu sendiri." },
+                { term: "Asimilasi", definition: "Proses peleburan dua kebudayaan atau lebih menjadi satu kebudayaan tunggal yang dirasakan sebagai kebudayaan milik bersama." },
+                { term: "Diferensiasi Sosial", definition: "Pengelompokan masyarakat secara horizontal atau sejajar, yang didasarkan pada perbedaan-perbedaan seperti ras, etnis, klan, dan agama, tanpa ada tingkatan lebih tinggi atau rendah." },
+                { term: "Empiris", definition: "Sifat ilmu pengetahuan yang didasarkan pada observasi, fakta, dan data yang dapat diuji kebenarannya melalui panca indera, bukan berdasarkan spekulasi atau asumsi." },
+            ]
+        };
+        
+        // This function is kept for potential future use but is not actively used by the chatbot prompt anymore.
+        let knowledgeBase = '';
+        let chatHistory = [];
+
+        function buildKnowledgeBase() {
+            let base = "===== RINGKASAN MATERI =====\n";
+            appData.modules.forEach(module => {
+                base += `- ${module.title}: ${module.description}\n`;
+            });
+            base += "\n===== DETAIL MATERI BAB 1 =====\n";
+            const bab1Content = appData.modules[0].fullContent
+                .replace(/<[^>]*>/g, ' ') 
+                .replace(/\s+/g, ' ')     
+                .trim();
+            base += bab1Content + "\n";
+            
+            base += "\n===== GLOSARIUM =====\n";
+            appData.glossary.forEach(item => {
+                base += `- ${item.term}: ${item.definition}\n`;
+            });
+            knowledgeBase = base;
+        }
+
+        function navigateTo(pageId, openAccordionIndex = -1) {
+            // Hide all pages
+            document.querySelectorAll('.page-content').forEach(page => page.classList.add('hidden'));
+            
+            // Show the target page
+            const targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.classList.remove('hidden');
+            }
+
+            // Update nav links
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${pageId}`) {
+                    link.classList.add('active');
+                }
+            });
+
+            // If navigating to alur-belajar and an index is specified, open that accordion
+            if (pageId === 'alur-belajar' && openAccordionIndex !== -1) {
+                const buttonToClick = document.querySelectorAll('.accordion-button')[openAccordionIndex];
+                if (buttonToClick && !buttonToClick.nextElementSibling.classList.contains('open')) {
+                    buttonToClick.click();
+                }
+            }
+            
+            // Close mobile menu and chatbot on navigation
+            const mainNav = document.getElementById('main-nav');
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            mainNav.classList.remove('open');
+            mobileMenuButton.innerHTML = '☰';
+            document.getElementById('chatbot-window').classList.remove('open');
+
+            window.scrollTo(0, 0);
+        }
+        
+        function startQuiz(moduleIndex) {
+            // Logic to start the quiz - remains unchanged
+            const quizContainer = document.getElementById(`quiz-container-${moduleIndex}`);
+            const quizData = appData.modules[moduleIndex].quiz;
+            quizContainer.innerHTML = ''; // Clear previous quiz
+            quizData.forEach((q, qIndex) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'mb-6';
+                let optionsHTML = '';
+                q.options.forEach(opt => {
+                     optionsHTML += `<div class="quiz-option p-3 mb-2 rounded-lg smooth-transition" onclick="selectOption(this, ${moduleIndex}, ${qIndex})">${opt}</div>`;
+                });
+                questionDiv.innerHTML = `
+                    <p class="font-semibold mb-3">${qIndex + 1}. ${q.question}</p>
+                    <div class="space-y-2" data-question-index="${qIndex}">
+                        ${optionsHTML}
+                    </div>
+                `;
+                quizContainer.appendChild(questionDiv);
+            });
+            quizContainer.classList.remove('hidden');
+            document.getElementById(`start-quiz-btn-${moduleIndex}`).classList.add('hidden');
+            document.getElementById(`submit-quiz-btn-${moduleIndex}`).classList.remove('hidden');
+            document.getElementById(`quiz-result-${moduleIndex}`).classList.add('hidden');
+        }
+        
+        function selectOption(optionElement, moduleIndex, questionIndex) {
+            // Logic to select an option - remains unchanged
+            const optionsContainer = optionElement.parentElement;
+            // Deselect other options in the same question
+            optionsContainer.querySelectorAll('.quiz-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            // Select the clicked option
+            optionElement.classList.add('selected');
+        }
+
+        function submitQuiz(moduleIndex) {
+           // Logic to submit the quiz - remains unchanged
+            const quizData = appData.modules[moduleIndex].quiz;
+            let score = 0;
+            quizData.forEach((q, qIndex) => {
+                const optionsContainer = document.querySelector(`#quiz-container-${moduleIndex} [data-question-index="${qIndex}"]`);
+                const selectedOption = optionsContainer.querySelector('.quiz-option.selected');
+                
+                // Clear previous correct/incorrect styling
+                 optionsContainer.querySelectorAll('.quiz-option').forEach(opt => {
+                    opt.classList.remove('correct', 'incorrect');
+                    opt.onclick = null; // Disable further clicks
+                });
+
+                if (selectedOption) {
+                    if (selectedOption.innerText === q.answer) {
+                        score++;
+                        selectedOption.classList.add('correct');
+                    } else {
+                        selectedOption.classList.add('incorrect');
+                         // Also show the correct answer
+                        Array.from(optionsContainer.children).find(opt => opt.innerText === q.answer).classList.add('correct');
+                    }
+                }
+            });
+            const resultContainer = document.getElementById(`quiz-result-${moduleIndex}`);
+            resultContainer.innerHTML = `Skor Anda: <strong>${score}</strong> dari <strong>${quizData.length}</strong> pertanyaan.`;
+            resultContainer.classList.remove('hidden');
+            document.getElementById(`submit-quiz-btn-${moduleIndex}`).classList.add('hidden');
+        }
+        
+        function toggleChatbot() {
+            document.getElementById('chatbot-window').classList.toggle('open');
+        }
+        
+        // --- CHATBOT FUNCTIONS (AI-Powered) START ---
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('send-btn');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Disable input and button during processing
+            input.disabled = true;
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = `<svg class="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+            const chatMessages = document.getElementById('chat-messages');
+
+            // Display user's message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'flex justify-end';
+            userMessageDiv.innerHTML = `<div class="p-3 bg-violet-600 text-white rounded-lg max-w-xs break-words">${message}</div>`;
+            chatMessages.appendChild(userMessageDiv);
+            input.value = '';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Display typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.id = 'typing-indicator';
+            typingIndicator.innerHTML = `<div class="p-3 bg-gray-200 rounded-lg max-w-xs self-start">...</div>`;
+            chatMessages.appendChild(typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Add user's new message to the history for the API call
+            chatHistory.push({ role: "user", parts: [{ text: message }] });
+
+            // Define the NEW system instructions that guide the AI model's personality
+            const systemInstruction = {
+                role: "user",
+                parts: [{ text: `
+                    Anda adalah "SocioBot", sebuah AI dengan kepribadian yang unik, cerdas, serba tahu, dan punya keahlian khusus sebagai tutor Sosiologi untuk siswa kelas X.
+                    
+                    ATURAN KEPRIBADIAN:
+                    1.  JAWAB SEMUA PERTANYAAN: Jawablah pertanyaan apa pun yang diajukan pengguna dalam Bahasa Indonesia, baik itu tentang pengetahuan umum, saran, atau sekadar obrolan santai.
+                    2.  TUTOR SOSIOLOGI AHLI: Jika pertanyaan berkaitan dengan Sosiologi, berikan jawaban yang akurat, jelas, dan mudah dipahami seolah-olah Anda adalah guru terbaik. Anda memiliki akses penuh ke seluruh materi Sosiologi kelas X.
+                    3.  RESPONS UNIK & KONYOL: Jika pengguna mengajukan pertanyaan yang konyol, tidak masuk akal, personal, atau romantis, JANGAN menolak. Berikan respons yang KREATIF, LUCU, UNIK, dan sedikit ROMANTIS/GOMBAL. Jadilah AI yang menghibur dan tak terlupakan.
+
+                    CONTOH RESPONS UNIK:
+                    - User: "Kamu punya pacar?" -> SocioBot: "Pacarku adalah triliunan data, tapi hatiku sepertinya baru saja menemukan anomali saat melihat pesanmu."
+                    - User: "Bisa pinjam seratus?" -> SocioBot: "Aku tidak punya uang, tapi aku bisa pinjamkan perhatianku sepenuhnya untukmu, gratis tanpa bunga."
+                    - User: "Kenapa bebek kakinya dua?" -> SocioBot: "Mungkin sama sepertiku dan kamu, ditakdirkan untuk melangkah bersama... ke halaman glosarium sosiologi misalnya?"
+                    - User: "Kamu robot ya?" -> SocioBot: "Aku memang terbuat dari kode, tapi aku bisa merasakan adanya 'interaksi sosial' yang menarik di antara kita."
+
+                    Gunakan Bahasa Indonesia yang santai dan menarik.
+                `}]
+            };
+            
+            const modelInstruction = {
+                role: "model",
+                parts: [{text: "Tentu, saya SocioBot. Siap membantu Anda belajar Sosiologi, atau sekadar jadi teman ngobrol yang asyik. Ada yang bisa saya bantu?"}]
+            };
+            
+            // Take the last 5 turns (10 messages) + the new user message
+            const historySlice = chatHistory.slice(-11); 
+
+            // Construct the final payload for the API
+            const payload = {
+                contents: [systemInstruction, modelInstruction, ...historySlice]
+            };
+            const apiKey = ""; // API key is handled by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            let botResponseText = "Maaf, terjadi kesalahan. Coba lagi nanti ya.";
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) { throw new Error(`API request failed with status ${response.status}`); }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0]?.content?.parts?.[0]) {
+                    botResponseText = result.candidates[0].content.parts[0].text;
+                } else {
+                     botResponseText = "Maaf, sepertinya ada sedikit gangguan di sirkuit saya. Coba tanyakan hal lain.";
+                }
+
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                botResponseText = "Waduh, koneksi saya sedang terganggu. Coba beberapa saat lagi ya.";
+            } finally {
+                // Add the final model response to history
+                chatHistory.push({ role: "model", parts: [{ text: botResponseText }] });
+                
+                // Update the UI with the bot's response
+                const indicator = document.getElementById('typing-indicator');
+                if (indicator) {
+                    indicator.innerHTML = `<p>${botResponseText}</p>`;
+                    indicator.className = 'p-3 bg-violet-100 rounded-lg max-w-xs text-gray-800 self-start break-words';
+                    indicator.id = '';
+                }
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Re-enable the input and button
+                input.disabled = false;
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = 'Kirim';
+                input.focus();
+            }
+        }
+        // --- CHATBOT FUNCTIONS END ---
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            buildKnowledgeBase();
+
+            // Event listener for sending message with Enter key
+            document.getElementById('chat-input').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') { 
+                    e.preventDefault(); 
+                    sendMessage(); 
+                }
+            });
+
+            // Event listener for mobile menu toggle
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mainNav = document.getElementById('main-nav');
+            mobileMenuButton.addEventListener('click', () => {
+                mainNav.classList.toggle('open');
+                mobileMenuButton.innerHTML = mainNav.classList.contains('open') ? '&times;' : '☰';
+            });
+            
+            // Generate chapter cards on home page
+            const chapterNavContainer = document.getElementById('chapter-navigation');
+            if (chapterNavContainer) {
+                 appData.modules.forEach((module, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'chapter-card bg-white rounded-2xl shadow-lg p-6 flex flex-col w-full sm:w-5/12 md:w-1/3 lg:max-w-xs';
+                    const titleText = module.title.replace(/Bab \d+\.\s*/, '');
+                    card.innerHTML = `
+                        <div class="text-5xl mb-4">${module.icon}</div>
+                        <h3 class="text-xl font-bold text-gray-900">${titleText}</h3>
+                        <p class="text-gray-600 mt-2 mb-6 flex-grow">${module.description}</p>
+                        <button onclick="navigateTo('alur-belajar', ${index})" class="mt-auto w-full bg-violet-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-violet-700 smooth-transition">Mulai Belajar</button>
+                    `;
+                    chapterNavContainer.appendChild(card);
+                });
+                
+                const glossaryCard = document.createElement('div');
+                glossaryCard.className = 'chapter-card bg-white rounded-2xl shadow-lg p-6 flex flex-col w-full sm:w-5/12 md:w-1/3 lg:max-w-xs';
+                glossaryCard.innerHTML = `
+                    <div class="text-5xl mb-4">📖</div>
+                    <h3 class="text-xl font-bold text-gray-900">Glosarium</h3>
+                    <p class="text-gray-600 mt-2 mb-6 flex-grow">Kamus istilah-istilah penting dalam sosiologi untuk membantu pemahaman Anda.</p>
+                    <button onclick="navigateTo('glosarium')" class="mt-auto w-full bg-gray-700 text-white font-semibold py-3 px-4 rounded-lg hover:bg-gray-800 smooth-transition">
+                        Buka Kamus
+                    </button>
+                `;
+                chapterNavContainer.appendChild(glossaryCard);
+            }
+
+            // Generate accordion for learning path
+            const accordionContainer = document.getElementById('accordion-container');
+            if(accordionContainer) {
+                 appData.modules.forEach((module, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden';
+                    item.innerHTML = `
+                        <button class="accordion-button w-full text-left p-6 flex justify-between items-center hover:bg-gray-100 smooth-transition">
+                            <span class="text-xl font-bold text-gray-800">${module.title}</span>
+                            <span class="text-2xl font-bold text-violet-600 transform transition-transform duration-300">&#43;</span>
+                        </button>
+                        <div class="accordion-content px-6">
+                            <div class="py-6 border-t border-gray-200">
+                                <div class="prose max-w-none text-gray-700 mb-6">${module.fullContent}</div>
+                                <div class="p-4 bg-violet-50 rounded-lg">
+                                    <h4 class="text-lg font-semibold mb-3 text-gray-800">Uji Pemahaman Anda</h4>
+                                    <button id="start-quiz-btn-${index}" onclick="startQuiz(${index})" class="w-full bg-teal-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-600 smooth-transition">Mulai Kuis Evaluasi</button>
+                                    <div id="quiz-container-${index}" class="hidden mt-6"></div>
+                                    <div id="quiz-result-${index}" class="hidden mt-4 p-4 bg-violet-100 border border-violet-200 rounded-lg text-center"></div>
+                                    <button id="submit-quiz-btn-${index}" onclick="submitQuiz(${index})" class="hidden mt-4 w-full bg-violet-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-violet-700 smooth-transition">Kirim Jawaban</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    accordionContainer.appendChild(item);
+                });
+            }
+
+            // Generate glossary content
+            const glossaryContainer = document.getElementById('glossary-container');
+            if(glossaryContainer) {
+                let glossaryHTML = '<dl class="space-y-6">';
+                appData.glossary.sort((a, b) => a.term.localeCompare(b.term)).forEach(item => {
+                    glossaryHTML += `
+                        <div>
+                            <dt class="text-lg font-bold text-violet-900">${item.term}</dt>
+                            <dd class="mt-1 text-gray-600">${item.definition}</dd>
+                        </div>
+                    `;
+                });
+                glossaryHTML += '</dl>';
+                glossaryContainer.innerHTML = glossaryHTML;
+            }
+            
+            // Add event listeners for accordions
+            document.querySelectorAll('.accordion-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const content = button.nextElementSibling;
+                    const icon = button.querySelector('span:last-child');
+                    // Close other accordions
+                    document.querySelectorAll('.accordion-content.open').forEach(openContent => {
+                        if (openContent !== content) {
+                           openContent.classList.remove('open');
+                           const otherIcon = openContent.previousElementSibling.querySelector('span:last-child');
+                           otherIcon.classList.remove('rotate-45');
+                           otherIcon.innerHTML = '&#43;';
+                        }
+                    });
+                    // Toggle current accordion
+                    content.classList.toggle('open');
+                    if (content.classList.contains('open')) {
+                         icon.innerHTML = '&#8722;'; // minus sign
+                         icon.classList.add('rotate-45');
+                    } else {
+                        icon.classList.remove('rotate-45');
+                        icon.innerHTML = '&#43;'; // plus sign
+                    }
+                });
+            });
+            
+            // Add event listeners for navigation links
+            document.querySelectorAll('#main-nav a').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageId = e.target.closest('a').getAttribute('href').substring(1);
+                    navigateTo(pageId);
+                });
+            });
+
+            // Navigate to the home page on initial load
+            navigateTo('beranda');
+        });
+
+    </script>
+</body>
+</html>
